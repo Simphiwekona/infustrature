@@ -3,6 +3,7 @@ package com.example.infustratureportal.service;
 import com.example.infustratureportal.dto.LoginUserDto;
 import com.example.infustratureportal.dto.RegisterUserDto;
 import com.example.infustratureportal.dto.VerifyUserDto;
+import com.example.infustratureportal.exception.VerificationException;
 import com.example.infustratureportal.model.User;
 import com.example.infustratureportal.repository.UserRepository;
 import jakarta.mail.MessagingException;
@@ -35,11 +36,25 @@ public class AuthenticationService {
     }
 
     public User signup(RegisterUserDto input) {
-        User user = new User(input.getUsername(), input.getEmail(), passwordEncoder.encode(input.getPassword()));
-        System.out.println("Email :" + input.getEmail());
+
+        if (userRepository.findByEmail(input.getEmail()).isPresent()) {
+            throw new RuntimeException("Email is already registered");
+        }
+
+        User user = new User();
+        user.setEmail(input.getEmail());
+        user.setUsername(input.getUsername());
+        user.setPassword(passwordEncoder.encode(input.getPassword()));
         user.setVerificationCode(generateVerificationCode());
         user.setVerificationWillExpire(LocalDateTime.now().plusMinutes(15));
         user.setEnabled(false);
+
+//        Sending the verification email
+        String email = input.getEmail();
+        String subject = "Verification Email";
+        String text = "Dear " + user.getUsername() + ",\n\nPlease use the following code to verify your email: " + user.getVerificationCode();
+
+        System.out.println("info : " +user);
         sendVerificationEmail(user);
         return userRepository.save(user);
     }
@@ -66,7 +81,7 @@ public class AuthenticationService {
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
             if (user.getVerificationWillExpire().isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Verification code has expired");
+                throw new VerificationException("Verification code has expired");
             }
             if (user.getVerificationCode().equals(input.getVerificationCode())) {
                 user.setEnabled(true);
@@ -74,10 +89,10 @@ public class AuthenticationService {
                 user.setVerificationWillExpire(null);
                 userRepository.save(user);
             } else {
-                throw new RuntimeException("Invalid verification code");
+                throw new VerificationException("Invalid verification code");
             }
         } else {
-            throw new RuntimeException("User not found");
+            throw new VerificationException("User not found");
         }
     }
 
@@ -98,6 +113,7 @@ public class AuthenticationService {
     }
 
     private void sendVerificationEmail(User user) {
+        String to = user.getEmail();
         String subject = "Account Verification";
         String verificationCode = user.getVerificationCode();
         String htmlMessage = "<html>"
@@ -113,7 +129,7 @@ public class AuthenticationService {
                 + "</body>"
                 + "</html>";
         try {
-            emailService.sendVerificationEmail(user.getEmail(), subject, htmlMessage);
+            emailService.sendVerificationEmail(to, subject, htmlMessage);
         } catch (MessagingException e) {
             throw new RuntimeException("Failed to send verification email", e);
         }

@@ -7,11 +7,13 @@ import com.example.infustratureportal.model.User;
 import com.example.infustratureportal.response.LoginResponse;
 import com.example.infustratureportal.service.AuthenticationService;
 import com.example.infustratureportal.service.JWTService;
+import jakarta.mail.MessagingException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@CrossOrigin("*")
 public class AuthenticationController {
 
     private final JWTService jwtService;
